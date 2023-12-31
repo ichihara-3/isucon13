@@ -27,12 +27,14 @@ APP_RESTART = sudo systemctl restart isupipe-go.service
 GO_BUILD = cd "$(PWD)/go/" && make build 
 SQL_RUN = mysql -h 127.0.0.1 -uisucon -pisucon isupipe < "$(PWD)/sql/initdb.d/10_schema.sql"
 MYSQL_INIT = bash /home/isucon/webapp/sql/init.sh
+MYSQL_ROTATE = sudo test -f /var/log/mysql/mysql-slow.log && sudo mv /var/log/mysql/mysql-slow.log /var/log/mysql/mysql-slow.log.$(NOW) || echo "no slowlog"
 
 .PHONY: build
 build:
 	$(GO_BUILD)
 	$(APP_RESTART)
 	$(SQL_RUN)
+	$(MYSQL_ROTATE)
 	$(MYSQL_RESTART)
 	$(MYSQL_INIT)
 	sudo mv $(NGINX_LOG_PATH) $(NGINX_LOG_PATH).$(NOW)

@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -109,51 +108,22 @@ func connectDB(logger echo.Logger) (*sqlx.DB, error) {
 	return db, nil
 }
 
-func rotateSlowLog(logger echo.Logger) error {
-	if out, err := exec.Command("sudo", "mv", "/var/log/mysql/mysql-slow.log", "/var/log/mysql/mysql-slow.log."+time.Now().Format("20060102150405")).CombinedOutput(); err != nil {
-		logger.Warnf("failed to rotate slow log: %s", string(out))
-		return err
-	}
-	if out, err := exec.Command("sudo", "systemctl", "restart", "mysqld.service").CombinedOutput(); err != nil {
-		logger.Warnf("failed to restart mysql: %s", string(out))
-		return err
-	}
-	return nil
-}
-
 func enableSlowLog(logger echo.Logger) error {
-	initCon, err := connectDB(logger)
-	if err != nil {
+	if _, err := dbConn.Exec("SET GLOBAL slow_query_log = ON;"); err != nil {
 		return err
 	}
-	defer initCon.Close()
-	if _, err := initCon.Exec("SET GLOBAL slow_query_log = ON;"); err != nil {
+	if _, err := dbConn.Exec("SET GLOBAL long_query_time = 0;"); err != nil {
 		return err
 	}
-	if _, err := initCon.Exec("SET GLOBAL long_query_time = 0;"); err != nil {
+	if _, err := dbConn.Exec("SET GLOBAL log_output = 'FILE';"); err != nil {
 		return err
 	}
-	if _, err := initCon.Exec("SET GLOBAL log_output = 'FILE';"); err != nil {
-		return err
-	}
-	if _, err := initCon.Exec("SET GLOBAL slow_query_log_file = '/var/log/mysql/mysql-slow.log';"); err != nil {
+	if _, err := dbConn.Exec("SET GLOBAL slow_query_log_file = '/var/log/mysql/mysql-slow.log';"); err != nil {
 		return err
 	}
 	return nil
 }
 
-func rotateNginxLog(logger echo.Logger) error {
-	if out, err := exec.Command("sudo", "mv", "/var/log/nginx/access.log", "/var/log/nginx/access.log."+time.Now().Format("20060102150405")).CombinedOutput(); err != nil {
-		logger.Warnf("failed to rotate nginx log: %s", string(out))
-		return err
-	}
-	if out, err := exec.Command("sudo", "systemctl", "restart", "nginx.service").CombinedOutput(); err != nil {
-		logger.Warnf("failed to restart nginx: %s", string(out))
-		return err
-	}
-	return nil
-}
-	
 
 func initializeHandler(c echo.Context) error {
 	if out, err := exec.Command("../sql/init.sh").CombinedOutput(); err != nil {
@@ -161,20 +131,11 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize table: "+err.Error())
 	}
 	if slowlog {
-		err := rotateSlowLog(c.Logger())
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to rotate SlowLog "+err.Error())
-		}
-		// enable slow log
-		err = enableSlowLog(c.Logger())
+		err := enableSlowLog(c.Logger())
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to Enable SlowLog: "+err.Error())
 		}
 	}
-	if err := rotateNginxLog(c.Logger()); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to rotate Nginx Log: "+err.Error())
-	}
-
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "golang",
