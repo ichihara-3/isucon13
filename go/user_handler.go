@@ -26,6 +26,7 @@ const (
 	defaultUserIDKey         = "USERID"
 	defaultUsernameKey       = "USERNAME"
 	bcryptDefaultCost        = bcrypt.MinCost
+	defaultIconHash		     = "d9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0"
 )
 
 var fallbackImage = "../img/NoImage.jpg"
@@ -258,6 +259,7 @@ func registerHandler(c echo.Context) error {
 	}
 
 	userModel.ID = userID
+	userModel.IconHash = defaultIconHash
 
 	themeModel := ThemeModel{
 		UserID:   userID,
@@ -421,14 +423,6 @@ func verifyUserSession(c echo.Context) error {
 
 func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (User, error) {
 
-	var hash string
-	if userModel.IconHash == "" {
-		// No Image hash
-		hash = "d9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0"
-	} else {
-		hash = userModel.IconHash
-	}
-
 	user := User{
 		ID:          userModel.ID,
 		Name:        userModel.Name,
@@ -438,7 +432,7 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 			ID:       userModel.ThemeID,
 			DarkMode: userModel.DarkMode,
 		},
-		IconHash: hash,
+		IconHash: userModel.IconHash,
 	}
 
 	return user, nil
