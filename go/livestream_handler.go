@@ -496,6 +496,9 @@ func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel Li
 }
 
 func batchFillLivestreamResponse(livestreamModels []*LivestreamModel, ctx context.Context, tx *sqlx.Tx) ([]Livestream, error) {
+		if len(livestreamModels) == 0 {
+			return make([]Livestream, 0), nil
+		}
 		// map[livestream_id]*UserModel
 		usersByUserIDs := make(map[int64]*UserModel)
 		livestreamIds := make([]int64, len(livestreamModels))
@@ -507,7 +510,8 @@ func batchFillLivestreamResponse(livestreamModels []*LivestreamModel, ctx contex
 		}
 		query, params, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", userIds)
 		if err != nil {
-			return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to create sqlx.In query: "+err.Error())
+			message := fmt.Sprintf("batchFillLivestreamResponse: failed to create sqlx.In query: %s, userIds: %x", err.Error(), userIds)
+			return nil, echo.NewHTTPError(http.StatusInternalServerError, message)
 		}
 		var userModels []*UserModel
 		if err := tx.SelectContext(ctx, &userModels, query, params...); err != nil {
@@ -521,7 +525,8 @@ func batchFillLivestreamResponse(livestreamModels []*LivestreamModel, ctx contex
 		tagsByLivestreamID := make(map[int64][]Tag)
 		query, params, err = sqlx.In("SELECT tags.id as tag_id, tags.name as tag_name, livestream_id FROM livestream_tags INNER JOIN tags ON livestream_tags.tag_id = tags.id WHERE livestream_id IN (?)", livestreamIds)
 		if err != nil {
-			return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to create sqlx.In query: "+err.Error())
+			message := fmt.Sprintf("batchFillLivestreamResponse: failed to create sqlx.In query: %s, livestreamIds: %x", err.Error(), livestreamIds)
+			return nil, echo.NewHTTPError(http.StatusInternalServerError, message)
 		}
 		var tagLivestreamIDModels []*TagLivestreamIDModel
 		if err := tx.SelectContext(ctx, &tagLivestreamIDModels, query, params...); err != nil {
