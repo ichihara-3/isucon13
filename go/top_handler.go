@@ -18,6 +18,13 @@ type TagModel struct {
 	Name string `db:"name"`
 }
 
+type TagLivestreamIDModel struct {
+	TagID         int64 `db:"tag_id"`
+	TagName		  string `db:"tag_name"`
+	LivestreamID  int64 `db:"livestream_id"`
+}
+
+
 type TagsResponse struct {
 	Tags []*Tag `json:"tags"`
 }

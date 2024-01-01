@@ -208,11 +208,68 @@ func searchLivestreamsHandler(c echo.Context) error {
 		}
 	}
 
+	// map[livestream_id]*UserModel
+	usersByUserIDs := make(map[int64]*UserModel)
+	livestreamIds := make([]int64, len(livestreamModels))
+	userIds := make([]int64, len(livestreamModels))
+	
+	for i, livestreamModel := range livestreamModels {
+		livestreamIds[i] = livestreamModel.ID
+		userIds[i] = livestreamModel.UserID
+	}
+	query, params, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", userIds)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create sqlx.In query: "+err.Error())
+	}
+	var userModels []*UserModel
+	if err := tx.SelectContext(ctx, &userModels, query, params...); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get users: "+err.Error())
+	}
+	for _, userModel := range userModels {
+		usersByUserIDs[userModel.ID] = userModel
+	}
+
+	// map[livestream_id][]*TagModel
+	tagsByLivestreamID := make(map[int64][]Tag)
+	query, params, err = sqlx.In("SELECT tags.id as tag_id, tags.name as tag_name, livestream_id FROM livestream_tags INNER JOIN tags ON livestream_tags.tag_id = tags.id WHERE livestream_id IN (?)", livestreamIds)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create sqlx.In query: "+err.Error())
+	}
+	var tagLivestreamIDModels []*TagLivestreamIDModel
+	if err := tx.SelectContext(ctx, &tagLivestreamIDModels, query, params...); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get tags: "+err.Error())
+	}
+	for _, tagLivestreamIDModel := range tagLivestreamIDModels {
+		if _, ok := tagsByLivestreamID[tagLivestreamIDModel.LivestreamID]; !ok {
+			tagsByLivestreamID[tagLivestreamIDModel.LivestreamID] = make([]Tag, 0)
+		}
+		tag := Tag{
+			ID:   tagLivestreamIDModel.TagID,
+			Name: tagLivestreamIDModel.TagName,
+		}
+		tagsByLivestreamID[tagLivestreamIDModel.LivestreamID] = append(tagsByLivestreamID[tagLivestreamIDModel.LivestreamID], tag)
+	}
+	
+
+
 	livestreams := make([]Livestream, len(livestreamModels))
-	for i := range livestreamModels {
-		livestream, err := fillLivestreamResponse(ctx, tx, *livestreamModels[i])
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill livestream: "+err.Error())
+	for i, livestreamModel := range livestreamModels {
+		owner := fillUserResponse(*usersByUserIDs[livestreamModel.UserID])
+		tags := tagsByLivestreamID[livestreamModel.ID]
+		if tags == nil {
+			tags = make([]Tag, 0)
+		}
+
+		livestream := Livestream{
+			ID:           livestreamModel.ID,
+			Owner:        owner,
+			Title:        livestreamModel.Title,
+			Tags:         tags,
+			Description:  livestreamModel.Description,
+			PlaylistUrl:  livestreamModel.PlaylistUrl,
+			ThumbnailUrl: livestreamModel.ThumbnailUrl,
+			StartAt:      livestreamModel.StartAt,
+			EndAt:        livestreamModel.EndAt,
 		}
 		livestreams[i] = livestream
 	}
@@ -476,10 +533,7 @@ func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel Li
 	if err := tx.GetContext(ctx, &ownerModel, "SELECT * FROM users WHERE id = ?", livestreamModel.UserID); err != nil {
 		return Livestream{}, err
 	}
-	owner, err := fillUserResponse(ctx, tx, ownerModel)
-	if err != nil {
-		return Livestream{}, err
-	}
+	owner := fillUserResponse(ownerModel)
 
 	var tagModels []*TagModel
 	if err := tx.SelectContext(ctx, &tagModels, "select tags.id, tags.name from tags inner join livestream_tags on tags.id = livestream_tags.tag_id where livestream_tags.livestream_id = ?", livestreamModel.ID); err != nil {
