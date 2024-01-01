@@ -37,6 +37,8 @@ type UserModel struct {
 	Description    string `db:"description"`
 	HashedPassword string `db:"password"`
 	IconHash	   string `db:"icon_hash"`
+	DarkMode	   bool   `db:"dark_mode"`
+	ThemeID        int64  `db:"theme_id"`
 }
 
 type User struct {
@@ -261,9 +263,17 @@ func registerHandler(c echo.Context) error {
 		UserID:   userID,
 		DarkMode: req.Theme.DarkMode,
 	}
-	if _, err := tx.NamedExecContext(ctx, "INSERT INTO themes (user_id, dark_mode) VALUES(:user_id, :dark_mode)", themeModel); err != nil {
+	rs, err := tx.NamedExecContext(ctx, "INSERT INTO themes (user_id, dark_mode) VALUES(:user_id, :dark_mode)", themeModel)
+	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert user theme: "+err.Error())
 	}
+	themeId, err := rs.LastInsertId()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get last inserted theme id: "+err.Error())
+	}
+	userModel.ThemeID = themeId
+	userModel.DarkMode = req.Theme.DarkMode
+
 
 	if out, err := exec.Command("pdnsutil", "add-record", "u.isucon.local", req.Name, "A", "0", powerDNSSubdomainAddress).CombinedOutput(); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, string(out)+": "+err.Error())
@@ -410,10 +420,6 @@ func verifyUserSession(c echo.Context) error {
 }
 
 func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (User, error) {
-	themeModel := ThemeModel{}
-	if err := tx.GetContext(ctx, &themeModel, "SELECT * FROM themes WHERE user_id = ?", userModel.ID); err != nil {
-		return User{}, err
-	}
 
 	var hash string
 	if userModel.IconHash == "" {
@@ -429,8 +435,8 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 		DisplayName: userModel.DisplayName,
 		Description: userModel.Description,
 		Theme: Theme{
-			ID:       themeModel.ID,
-			DarkMode: themeModel.DarkMode,
+			ID:       userModel.ThemeID,
+			DarkMode: userModel.DarkMode,
 		},
 		IconHash: hash,
 	}

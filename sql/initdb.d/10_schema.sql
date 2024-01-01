@@ -13,6 +13,8 @@ DROP TABLE IF EXISTS `livecomment_reports`;
 DROP TABLE IF EXISTS `ng_words`;
 DROP TABLE IF EXISTS `reactions`;
 
+DROP TRIGGER IF EXISTS update_user_theme;
+
 
 -- ユーザ (配信者、視聴者)
 CREATE TABLE `users` (
@@ -22,6 +24,8 @@ CREATE TABLE `users` (
   `password` VARCHAR(255) NOT NULL,
   `description` TEXT NOT NULL,
   `icon_hash` VARCHAR(255) NOT NULL DEFAULT '',
+  `dark_mode` BOOLEAN NOT NULL DEFAULT true,
+  `theme_id` BIGINT NOT NULL DEFAULT 0,
   UNIQUE `uniq_user_name` (`name`),
   KEY `icon_hash` (`icon_hash`)
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
@@ -136,6 +140,15 @@ CREATE TABLE `reactions` (
   KEY `livestram_id` (`livestream_id`),
   KEY `user_id` (`user_id`)
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+
+delimiter |
+CREATE TRIGGER update_user_theme AFTER INSERT ON themes
+FOR EACH ROW
+BEGIN
+UPDATE users SET dark_mode = NEW.dark_mode, theme_id = NEW.id WHERE id = NEW.user_id;
+END;
+|
+delimiter ;
 
 -- use `isudns`;
 
