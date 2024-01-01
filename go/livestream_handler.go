@@ -211,7 +211,8 @@ func searchLivestreamsHandler(c echo.Context) error {
 	livestreams, err := batchFillLivestreamResponse(livestreamModels, ctx, tx)
 
 	if err := tx.Commit(); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
+		// http.StatusInternalServerError が返っているのでそのまま出力
+		return err
 	}
 
 	return c.JSON(http.StatusOK, livestreams)
@@ -238,13 +239,10 @@ func getMyLivestreamsHandler(c echo.Context) error {
 	if err := tx.SelectContext(ctx, &livestreamModels, "SELECT * FROM livestreams WHERE user_id = ?", userID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
 	}
-	livestreams := make([]Livestream, len(livestreamModels))
-	for i := range livestreamModels {
-		livestream, err := fillLivestreamResponse(ctx, tx, *livestreamModels[i])
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill livestream: "+err.Error())
-		}
-		livestreams[i] = livestream
+	livestreams, err := batchFillLivestreamResponse(livestreamModels, ctx, tx)
+	// http.StatusInternalServerError が返っているのでそのまま出力
+	if err != nil {
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {
