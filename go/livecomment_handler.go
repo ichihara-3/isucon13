@@ -109,7 +109,6 @@ func getLivecommentsHandler(c echo.Context) error {
 	usersByUserIDs := make(map[int64]*UserModel)
 	livestreamIds := make([]int64, len(livecommentModels))
 	userIds := make([]int64, len(livecommentModels))
-	c.Logger().Infof("livecommentModels: %v", livecommentModels)
 	
 	for i, livecommentModel := range livecommentModels {
 		livestreamIds[i] = livecommentModel.LivestreamID
