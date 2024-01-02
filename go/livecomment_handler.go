@@ -114,20 +114,15 @@ func getLivecommentsHandler(c echo.Context) error {
 		livestreamIds[i] = livecommentModel.LivestreamID
 		userIds[i] = livecommentModel.UserID
 	}
-	query, params, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", userIds)
+	userModels, err := listUsers(userIds, ctx)
 	if err != nil {
-		message := fmt.Sprintf("getLivecommentsHandler: failed to create sqlx.In query: %s, userIds: %x", err.Error(), userIds)
-		return echo.NewHTTPError(http.StatusInternalServerError, message)
-	}
-	var userModels []*UserModel
-	if err := tx.SelectContext(ctx, &userModels, query, params...); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get users: "+err.Error())
+		return err
 	}
 	for _, userModel := range userModels {
 		usersByUserIDs[userModel.ID] = userModel
 	}
 	var livestreamModels []*LivestreamModel
-	query, params, err = sqlx.In("SELECT * FROM livestreams WHERE id IN (?)", livestreamIds)
+	query, params, err := sqlx.In("SELECT * FROM livestreams WHERE id IN (?)", livestreamIds)
 	if err != nil {
 		message := fmt.Sprintf("getLivecommentsHandler: failed to create sqlx.In query: %s, livestreamIds: %x", err.Error(), livestreamIds)
 		return echo.NewHTTPError(http.StatusInternalServerError, message)

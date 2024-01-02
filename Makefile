@@ -25,9 +25,9 @@ list:
 NGINX_RESTART = sudo systemctl restart nginx.service
 APP_RESTART = sudo systemctl restart isupipe-go.service
 GO_BUILD = cd "$(PWD)/go/" && make build 
-SQL_RUN = mysql -h 127.0.0.1 -uisucon -pisucon isupipe < "$(PWD)/sql/initdb.d/10_schema.sql"
+SQL_RUN = $(MYSQL) isupipe < "$(PWD)/sql/initdb.d/10_schema.sql"
 MYSQL_INIT = bash /home/isucon/webapp/sql/init.sh
-MYSQL_ROTATE = sudo test -f /var/log/mysql/mysql-slow.log && sudo mv /var/log/mysql/mysql-slow.log /var/log/mysql/mysql-slow.log.$(NOW) || echo "no slowlog"
+MYSQL_ROTATE = $(SSH_MYSQL_HOST) 'sudo test -f /var/log/mysql/mysql-slow.log && sudo mv /var/log/mysql/mysql-slow.log /var/log/mysql/mysql-slow.log.$(NOW) || echo "no slowlog"'
 
 .PHONY: build
 build:
@@ -71,19 +71,19 @@ alp:
 	$(ALP)
 
 # MySQL
-MYSQL_HOST=127.0.0.1
+MYSQL_HOST=192.168.0.12
 MYSQL_USER=isucon
 MYSQL_PASSWORD=isucon
 MYSQL_DATABESE=DATABASE
 
 SSH_MYSQL_HOST=ssh $(USER)@$(MYSQL_HOST)
-MYSQL=mysql -h$(MYSQL_HOST) -u$(USER) -p$(MYSQL_PASSWORD) $(DATABASE)
-MYSQL_RESTART=sudo systemctl restart mysql.service
+MYSQL=mysql -h$(MYSQL_HOST) -u$(USER) -p$(MYSQL_PASSWORD)
+MYSQL_RESTART=$(SSH_MYSQL_HOST) sudo systemctl restart mysql.service
 
 # mysqlに接続する
 .PHONY: mysql
 mysql:
-	@$(MYSQL)
+	$(MYSQL)
 
 .PHONY: mysql-restart
 mysql-restart:
@@ -91,7 +91,7 @@ mysql-restart:
 
 .PHONY: slowlog
 slowlog:
-	sudo pt-query-digest /var/log/mysql/mysql-slow.log
+	$(SSH_MYSQL_HOST) sudo pt-query-digest /var/log/mysql/mysql-slow.log
 
 .PHONY: setup
 setup:

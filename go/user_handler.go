@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -425,4 +427,17 @@ func fillUserResponse(userModel UserModel) User {
 	}
 
 	return user
+}
+
+func listUsers(userIds []int64, ctx context.Context) ([]*UserModel, error) {
+	query, params, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", userIds)
+	if err != nil {
+		message := fmt.Sprintf("batchFillLivestreamResponse: failed to create sqlx.In query: %s, userIds: %x", err.Error(), userIds)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, message)
+	}
+	var userModels []*UserModel
+	if err := dbConn.SelectContext(ctx, &userModels, query, params...); err != nil {
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to get users: "+err.Error())
+	}
+	return userModels, nil
 }
