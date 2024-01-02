@@ -174,21 +174,15 @@ func searchLivestreamsHandler(c echo.Context) error {
 	ctx := c.Request().Context()
 	keyTagName := c.QueryParam("tag")
 
-	tx, err := dbConn.BeginTxx(ctx, nil)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin transaction: "+err.Error())
-	}
-	defer tx.Rollback()
-
 	var livestreamModels []*LivestreamModel
 	if keyTagName != "" {
 		// タグによる取得
 		tagId, ok:= tagIds[keyTagName]
 		if !ok {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get tag: "+err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get tag")
 		}
 
-		if err := tx.SelectContext(ctx, &livestreamModels, "SELECT l.* FROM livestreams l INNER JOIN livestream_tags lt ON l.id = lt.livestream_id where tag_id = ? ORDER BY l.id DESC", tagId); err != nil {
+		if err := dbConn.SelectContext(ctx, &livestreamModels, "SELECT l.* FROM livestreams l INNER JOIN livestream_tags lt ON l.id = lt.livestream_id where tag_id = ? ORDER BY l.id DESC", tagId); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
 		}
 
@@ -203,15 +197,13 @@ func searchLivestreamsHandler(c echo.Context) error {
 			query += fmt.Sprintf(" LIMIT %d", limit)
 		}
 
-		if err := tx.SelectContext(ctx, &livestreamModels, query); err != nil {
+		if err := dbConn.SelectContext(ctx, &livestreamModels, query); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
 		}
 	}
 
-	livestreams, err := batchFillLivestreamResponse(livestreamModels, ctx, tx)
-
-	if err := tx.Commit(); err != nil {
-		// http.StatusInternalServerError が返っているのでそのまま出力
+	livestreams, err := batchFillLivestreamResponse(livestreamModels, ctx)
+	if err != nil {
 		return err
 	}
 
@@ -224,31 +216,20 @@ func getMyLivestreamsHandler(c echo.Context) error {
 		return err
 	}
 
-	tx, err := dbConn.BeginTxx(ctx, nil)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin transaction: "+err.Error())
-	}
-	defer tx.Rollback()
-
 	// error already checked
 	sess, _ := session.Get(defaultSessionIDKey, c)
 	// existence already checked
 	userID := sess.Values[defaultUserIDKey].(int64)
 
 	var livestreamModels []*LivestreamModel
-	if err := tx.SelectContext(ctx, &livestreamModels, "SELECT * FROM livestreams WHERE user_id = ?", userID); err != nil {
+	if err := dbConn.SelectContext(ctx, &livestreamModels, "SELECT * FROM livestreams WHERE user_id = ?", userID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
 	}
-	livestreams, err := batchFillLivestreamResponse(livestreamModels, ctx, tx)
+	livestreams, err := batchFillLivestreamResponse(livestreamModels, ctx)
 	// http.StatusInternalServerError が返っているのでそのまま出力
 	if err != nil {
 		return err
 	}
-
-	if err := tx.Commit(); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
-	}
-
 	return c.JSON(http.StatusOK, livestreams)
 }
 
@@ -495,7 +476,7 @@ func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel Li
 	return livestream, nil
 }
 
-func batchFillLivestreamResponse(livestreamModels []*LivestreamModel, ctx context.Context, tx *sqlx.Tx) ([]Livestream, error) {
+func batchFillLivestreamResponse(livestreamModels []*LivestreamModel, ctx context.Context) ([]Livestream, error) {
 		if len(livestreamModels) == 0 {
 			return make([]Livestream, 0), nil
 		}
@@ -524,7 +505,7 @@ func batchFillLivestreamResponse(livestreamModels []*LivestreamModel, ctx contex
 			return nil, echo.NewHTTPError(http.StatusInternalServerError, message)
 		}
 		var tagLivestreamIDModels []*TagLivestreamIDModel
-		if err := tx.SelectContext(ctx, &tagLivestreamIDModels, query, params...); err != nil {
+		if err := dbConn.SelectContext(ctx, &tagLivestreamIDModels, query, params...); err != nil {
 			return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to get tags: "+err.Error())
 		}
 		for _, tagLivestreamIDModel := range tagLivestreamIDModels {

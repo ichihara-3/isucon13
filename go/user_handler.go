@@ -432,7 +432,7 @@ func fillUserResponse(userModel UserModel) User {
 func listUsers(userIds []int64, ctx context.Context) ([]*UserModel, error) {
 	query, params, err := sqlx.In("SELECT * FROM users WHERE id IN (?)", userIds)
 	if err != nil {
-		message := fmt.Sprintf("batchFillLivestreamResponse: failed to create sqlx.In query: %s, userIds: %x", err.Error(), userIds)
+		message := fmt.Sprintf("listUsers: failed to create sqlx.In query: %s, userIds: %x", err.Error(), userIds)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError, message)
 	}
 	var userModels []*UserModel
