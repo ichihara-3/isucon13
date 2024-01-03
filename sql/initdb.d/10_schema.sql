@@ -13,12 +13,17 @@ DROP TABLE IF EXISTS `livecomment_reports`;
 DROP TABLE IF EXISTS `ng_words`;
 DROP TABLE IF EXISTS `reactions`;
 DROP TABLE IF EXISTS `scores`;
+DROP TABLE IF EXISTS `userscores`;
 
 DROP TRIGGER IF EXISTS update_user_theme;
 DROP TRIGGER IF EXISTS initialize_scores;
 DROP TRIGGER IF EXISTS update_scores_tip;
 DROP TRIGGER IF EXISTS update_scores_tip_deletion;
 DROP TRIGGER IF EXISTS update_scores_reaction;
+DROP TRIGGER IF EXISTS initialize_userscores;
+DROP TRIGGER IF EXISTS update_userscores_tip;
+DROP TRIGGER IF EXISTS update_userscores_tip_deletion;
+DROP TRIGGER IF EXISTS update_userscores_reaction;
 
 
 -- ユーザ (配信者、視聴者)
@@ -149,9 +154,22 @@ CREATE TABLE `reactions` (
 CREATE TABLE `scores` (
   `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `livestream_id` BIGINT NOT NULL,
-  `score` BIGINT NOT NULL,
+  `score` BIGINT NOT NULL DEFAULT 0,
   UNIQUE `uniq_livestream_id` (`livestream_id`),
-  KEY `livestream_id` (`livestream_id`)
+  KEY `livestream_id` (`livestream_id`),
+  KEY `score` (`score` DESC)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+
+CREATE TABLE `userscores` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `user_id` BIGINT NOT NULL,
+  `user_name` VARCHAR(255) NOT NULL,
+  `score` BIGINT NOT NULL DEFAULT 0,
+  `comment_count` BIGINT NOT NULL DEFAULT 0,
+  `tip_amount` BIGINT NOT NULL DEFAULT 0,
+  `reaction_count` BIGINT NOT NULL DEFAULT 0,
+  UNIQUE `uniq_user_id` (`user_id`),
+  KEY `score` (`score` DESC)
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 delimiter |
@@ -164,7 +182,7 @@ END;
 CREATE TRIGGER initialize_scores AFTER INSERT ON livestreams
 FOR EACH ROW
 BEGIN
-REPLACE INTO scores SET livestream_id=NEW.id, score = 0;
+REPLACE INTO scores SET livestream_id=NEW.id;
 END;
 |
 CREATE TRIGGER update_scores_tip BEFORE INSERT ON livecomments
@@ -183,6 +201,31 @@ CREATE TRIGGER update_scores_reaction BEFORE INSERT ON reactions
 FOR EACH ROW
 BEGIN
 UPDATE scores SET score = score + 1 WHERE livestream_id = NEW.livestream_id;
+END;
+|
+
+CREATE TRIGGER initialize_userscores AFTER INSERT ON users
+FOR EACH ROW
+BEGIN
+REPLACE INTO userscores SET user_id=NEW.id, user_name=NEW.name;
+END;
+|
+CREATE TRIGGER update_userscores_tip BEFORE INSERT ON livecomments
+FOR EACH ROW
+BEGIN
+UPDATE userscores SET score = score + NEW.tip, comment_count = comment_count + 1, tip_amount = tip_amount + NEW.tip WHERE user_id = NEW.user_id;
+END;
+|
+CREATE TRIGGER update_userscores_tip_deletion BEFORE DELETE ON livecomments
+FOR EACH ROW
+BEGIN
+UPDATE userscores SET score = score - OLD.tip, comment_count = comment_count - 1, tip_amount = tip_amount - OLD.tip WHERE user_id = OLD.user_id;
+END;
+|
+CREATE TRIGGER update_userscores_reaction BEFORE INSERT ON reactions
+FOR EACH ROW
+BEGIN
+UPDATE userscores SET score = score + 1, reaction_count = reaction_count + 1 WHERE user_id = NEW.user_id;
 END;
 |
 
