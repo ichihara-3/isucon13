@@ -20,6 +20,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	echolog "github.com/labstack/gommon/log"
+	"github.com/isucon/isucon13/webapp/go/json"
 )
 
 const (
@@ -146,6 +147,7 @@ func initializeHandler(c echo.Context) error {
 
 func main() {
 	e := echo.New()
+	e.JSONSerializer = &json.GoJSONSerializer{}
 	e.Debug = true
 	e.Logger.SetLevel(echolog.DEBUG)
 	e.Use(middleware.Logger())
