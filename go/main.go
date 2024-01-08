@@ -8,8 +8,8 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/http/pprof"
-	_ "net/http/pprof"
+	// "net/http/pprof"
+	// _ "net/http/pprof"
 	"os"
 	"os/exec"
 	"strconv"
@@ -29,7 +29,8 @@ const (
 	listenPort                     = 8080
 	powerDNSSubdomainAddressEnvKey = "ISUCON13_POWERDNS_SUBDOMAIN_ADDRESS"
 
-	slowlog = true
+	slowlog = false
+	echodebug = false
 )
 
 var (
@@ -150,20 +151,25 @@ func initializeHandler(c echo.Context) error {
 func main() {
 	e := echo.New()
 	e.JSONSerializer = &json.GoJSONSerializer{}
-	e.Debug = true
-	e.Logger.SetLevel(echolog.DEBUG)
+	if echodebug {
+		e.Debug = true
+		e.Logger.SetLevel(echolog.DEBUG)
+	} else {
+		e.Debug = false
+		e.Logger.SetLevel(echolog.OFF)
+	}
 	e.Use(middleware.Logger())
 	cookieStore := sessions.NewCookieStore(secret)
 	cookieStore.Options.Domain = "*.u.isucon.local"
 	e.Use(session.Middleware(cookieStore))
 	// e.Use(middleware.Recover())
 
-	pprofGroup := e.Group("/debug/pprof")
-	pprofGroup.GET("/cmdline", echo.WrapHandler(http.HandlerFunc(pprof.Cmdline)))
-	pprofGroup.GET("/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
-	pprofGroup.GET("/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
-	pprofGroup.GET("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
-	pprofGroup.Any("/*", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
+	// pprofGroup := e.Group("/debug/pprof")
+	// pprofGroup.GET("/cmdline", echo.WrapHandler(http.HandlerFunc(pprof.Cmdline)))
+	// pprofGroup.GET("/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
+	// pprofGroup.GET("/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
+	// pprofGroup.GET("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
+	// pprofGroup.Any("/*", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
 
 	// 初期化
 	e.POST("/api/initialize", initializeHandler)
