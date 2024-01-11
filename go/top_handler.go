@@ -19,39 +19,22 @@ type TagModel struct {
 }
 
 type TagLivestreamIDModel struct {
-	TagID         int64 `db:"tag_id"`
-	TagName		  string `db:"tag_name"`
-	LivestreamID  int64 `db:"livestream_id"`
+	TagID        int64  `db:"tag_id"`
+	TagName      string `db:"tag_name"`
+	LivestreamID int64  `db:"livestream_id"`
 }
-
 
 type TagsResponse struct {
 	Tags []*Tag `json:"tags"`
 }
 
 func getTagHandler(c echo.Context) error {
-	ctx := c.Request().Context()
 
-	tx, err := dbConn.BeginTxx(ctx, nil)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin new transaction: : "+err.Error()+err.Error())
-	}
-	defer tx.Rollback()
-
-	var tagModels []*TagModel
-	if err := tx.SelectContext(ctx, &tagModels, "SELECT * FROM tags"); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get tags: "+err.Error())
-	}
-
-	if err := tx.Commit(); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
-	}
-
-	tags := make([]*Tag, len(tagModels))
-	for i := range tagModels {
-		tags[i] = &Tag{
-			ID:   tagModels[i].ID,
-			Name: tagModels[i].Name,
+	tags := make([]*Tag, len(tagMap))
+	for id := range tagMap {
+		tags[id-1] = &Tag{
+			ID:   id,
+			Name: tagMap[id],
 		}
 	}
 	return c.JSON(http.StatusOK, &TagsResponse{
