@@ -142,6 +142,9 @@ func initializeHandler(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to Enable SlowLog: "+err.Error())
 		}
 	}
+	if err := os.RemoveAll("/home/isucon/icons"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to remove icons: "+err.Error())
+	}
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "golang",

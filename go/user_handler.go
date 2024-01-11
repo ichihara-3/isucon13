@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os/exec"
+	"os"
 	"sync"
 	"time"
 
@@ -105,8 +107,21 @@ func getIconHandler(c echo.Context) error {
 			if h == fmt.Sprintf("\"%s\"", hash) {
 				return c.NoContent(http.StatusNotModified)
 			}
+		} else {
+			f, err := os.Open(fmt.Sprintf("/home/isucon/icons/%d", userId))
+			if err != nil {
+				goto geticondb
+			}
+			defer f.Close()
+			image, err := io.ReadAll(f)
+			if err != nil {
+				goto geticondb
+			}
+			return c.Blob(http.StatusOK, "image/jpeg", image)
+
 		}
 	}
+geticondb:
 	var user UserModel
 	if err := dbConn.GetContext(ctx, &user, "SELECT id, icon_hash FROM users WHERE name = ?", username); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -168,6 +183,16 @@ func postIconHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
 	}
 
+	f, err := os.Create(fmt.Sprintf("/home/isucon/icons/%d", userID))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create icon file: "+err.Error())
+	}
+	defer f.Close()
+	if _, err := f.Write(req.Image); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to write icon file: "+err.Error())
+	}
+	
+	
 	userNameIconHash.Store(userID, hash)
 
 	return c.JSON(http.StatusCreated, &PostIconResponse{
