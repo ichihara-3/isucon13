@@ -28,6 +28,7 @@ GO_BUILD = cd "$(PWD)/go/" && make build
 SQL_RUN = $(MYSQL) isupipe < "$(PWD)/sql/initdb.d/10_schema.sql"
 MYSQL_INIT = bash /home/isucon/webapp/sql/init.sh
 MYSQL_ROTATE = $(SSH_MYSQL_HOST) 'sudo test -f /var/log/mysql/mysql-slow.log && sudo mv /var/log/mysql/mysql-slow.log /var/log/mysql/mysql-slow.log.$(NOW) || echo "no slowlog"'
+NGINX_DEPLOY = sudo cp -f "$(PWD)/etc/nginx/nginx.conf" /etc/nginx/nginx.conf && sudo cp -f "$(PWD)/etc/nginx/sites-enabled/isupipe.conf" /etc/nginx/sites-enabled/isupipe.conf
 
 .PHONY: build
 build:
@@ -38,6 +39,7 @@ build:
 	$(MYSQL_RESTART)
 	$(MYSQL_INIT)
 	sudo mv $(NGINX_LOG_PATH) $(NGINX_LOG_PATH).$(NOW)
+	$(NGINX_DEPLOY)
 	$(NGINX_RESTART)
 
 .PHONY: restart
