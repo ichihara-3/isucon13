@@ -8,6 +8,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
+	"sync"
+
 	// "net/http/pprof"
 	// _ "net/http/pprof"
 	"os"
@@ -20,9 +23,9 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 
 	"github.com/gorilla/sessions"
+	"github.com/isucon/isucon13/webapp/go/json"
 	"github.com/labstack/echo-contrib/session"
 	echolog "github.com/labstack/gommon/log"
-	"github.com/isucon/isucon13/webapp/go/json"
 )
 
 const (
@@ -130,8 +133,55 @@ func enableSlowLog(logger echo.Logger) error {
 	return nil
 }
 
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				result := ipnet.IP.String()
+				// private ip address
+				if strings.HasPrefix(result, "192.168.0.") {
+					return result
+				}
+			}
+		}
+	}
+	return ""
+}
+
+var IPList = []string{"192.168.0.11", "192.168.0.13"}
+
+func anotherHosts() []string {
+	result := []string{}
+	myIP := getLocalIP()
+	for _, ip := range IPList {
+		if ip != myIP {
+			result = append(result, ip)
+		}
+	}
+	return result
+}
+
 
 func initializeHandler(c echo.Context) error {
+	var wg sync.WaitGroup
+	for _, ip := range anotherHosts() {
+		wg.Add(1)
+		go func (ip string) {
+			// call initialize
+			c.Logger().Infof("call initialize to %s", ip)
+			url := fmt.Sprintf("http://%s:%d/api/initialize", ip, listenPort)
+			_, err := http.Post(url, "application/json", nil)
+			if err != nil {
+				c.Logger().Warnf("failed to call initialize: %s", err.Error())
+			}
+			wg.Done()
+		}(ip)
+	}
+	
 	if out, err := exec.Command("../sql/init.sh").CombinedOutput(); err != nil {
 		c.Logger().Warnf("init.sh failed with err=%s", string(out))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize table: "+err.Error())
@@ -145,6 +195,7 @@ func initializeHandler(c echo.Context) error {
 	if err := os.RemoveAll("/home/isucon/icons"); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to remove icons: "+err.Error())
 	}
+	wg.Wait()
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "golang",
