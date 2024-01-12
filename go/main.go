@@ -202,6 +202,16 @@ func initializeHandler(c echo.Context) error {
 	})
 }
 
+func initAppHandler(c echo.Context) error {
+	if err := os.RemoveAll("/home/isucon/icons"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to remove icons: "+err.Error())
+	}
+	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
+	return c.JSON(http.StatusOK, InitializeResponse{
+		Language: "golang",
+	})
+}
+
 func main() {
 	e := echo.New()
 	e.JSONSerializer = &json.GoJSONSerializer{}
@@ -227,6 +237,7 @@ func main() {
 
 	// 初期化
 	e.POST("/api/initialize", initializeHandler)
+	e.POST("/api/initApp", initAppHandler)
 
 	// top
 	e.GET("/api/tag", getTagHandler)
