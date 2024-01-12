@@ -173,7 +173,7 @@ func initializeHandler(c echo.Context) error {
 		go func (ip string) {
 			// call initialize
 			c.Logger().Infof("call initialize to %s", ip)
-			url := fmt.Sprintf("http://%s:%d/api/initialize", ip, listenPort)
+			url := fmt.Sprintf("http://%s:%d/api/initapp", ip, listenPort)
 			_, err := http.Post(url, "application/json", nil)
 			if err != nil {
 				c.Logger().Warnf("failed to call initialize: %s", err.Error())
@@ -237,7 +237,7 @@ func main() {
 
 	// 初期化
 	e.POST("/api/initialize", initializeHandler)
-	e.POST("/api/initApp", initAppHandler)
+	e.POST("/api/initapp", initAppHandler)
 
 	// top
 	e.GET("/api/tag", getTagHandler)
