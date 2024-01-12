@@ -218,7 +218,7 @@ func postLivecommentHandler(c echo.Context) error {
 	defer tx.Rollback()
 	
 	var livestreamModel LivestreamModel
-	if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID); err != nil {
+	if err := tx.GetContext(ctx, &livestreamModel, "SELECT id, user_id FROM livestreams WHERE id = ?", livestreamID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, "livestream not found")
 		} else {
